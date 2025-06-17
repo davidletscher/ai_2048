@@ -19,23 +19,23 @@ class Player(BasePlayer):
 			self._parentCount += 1
 			self._nodeCount += 1
 			print('Search depth', depth)
-			
-			best = -1000
+			best = -10000
 			for a in actions:
+				result = state.move(a)
 				if not self.timeRemaining(): return
-				result, score = state.result(a)
-				v = self.value(result, depth-1)
+				v = self.minPlayer(result, depth-1)
 				if v is None: return
 				if v > best:
 					best = v
 					bestMove = a
-					
+						
 			self.setMove(bestMove)
 			print('\tBest value', best, bestMove)
 
 			depth += 1
-			
-	def value(self, state, depth):
+
+	def maxPlayer(self, state, depth):
+		# The max player gets to choose the move
 		self._nodeCount += 1
 		self._childCount += 1
 
@@ -48,14 +48,38 @@ class Player(BasePlayer):
 			return self.heuristic(state)
 
 		self._parentCount += 1
-		
 		best = -10000
 		for a in actions:
 			if not self.timeRemaining(): return None
-			result, score = state.result(a)
-			v = self.value(result, depth-1)
+			result = state.move(a)
+			v = self.minPlayer(result, depth-1)
 			if v is None: return None
 			if v > best:
+				best = v
+				
+		return best
+
+	def minPlayer(self, state, depth):
+		# The min player chooses where to add the extra tile and whether it is a 2 or a 4
+		self._nodeCount += 1
+		self._childCount += 1
+
+		if state.gameOver():
+			return state.getScore()
+			
+		actions = self.moveOrder(state)
+
+		if depth == 0:
+			return self.heuristic(state)
+
+		self._parentCount += 1
+		best = 1e6
+		for (t,v) in state.possibleTiles():
+			if not self.timeRemaining(): return None
+			result = state.addTile(t,v)
+			v = self.maxPlayer(result, depth-1)
+			if v is None: return None
+			if v < best:
 				best = v
 
 		return best

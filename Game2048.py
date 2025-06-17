@@ -54,6 +54,20 @@ class Game2048:
 					possible.append((g,.25/len(zeros)))
 			
 		return possible
+		
+	def possibleTiles(self):
+		possible = []
+		zeros = [ i for i in range(16) if self._board[i] == 0 ]
+		for i in zeros:
+			for t in [1,2]:
+				possible.append((i,t))
+			
+		return possible
+		
+	def addTile(self, t, v):
+		g = copy.deepcopy(self)
+		g._board[t] = v
+		return g
 
 	def move(self, action):
 		board = []
