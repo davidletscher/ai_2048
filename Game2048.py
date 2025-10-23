@@ -1,23 +1,29 @@
 import time
 import random
 import copy
+import array
 
 class Game2048:
-	def __init__(self, b=None, s=None):
+	def __init__(self, b=None, s=None, randomize=False):
 		if b:
-			self._board = b
+			self._board = array.array('b', b)
 		else:
-			self._board = [0] * 16
+			self._board = array.array('b', [0]*16)
 		
 		if s:
 			self._score = s
 		else:
 			self._score = 0
+			
+		if randomize: self.randomize()
 		
 	def randomize(self):
 		self._board = []
 		for i in range(16):
 			self._board.append(random.choice([0]*16 + [1]*4 + [2]*2 + [3]))
+
+	def getBoard(self):
+		return self._board
 
 	def actions(self):
 		return ''.join([ a for a in 'UDLR' if self.move(a)._board != self._board ])
@@ -31,7 +37,19 @@ class Game2048:
 			g._board[i] = 2
 		else:
 			g._board[i] = 1
+			
 		return g, g._score - s
+		
+	def addRandomTile(self):		
+		g = copy.deepcopy(self)
+		zeros = [ i for i in range(16) if g._board[i] == 0 ]
+		i = random.choice(zeros)
+		if random.randint(0,3) == 3:
+			g._board[i] = 2
+		else:
+			g._board[i] = 1
+			
+		return g
 		
 	def getScore(self):
 		return self._score
@@ -40,18 +58,18 @@ class Game2048:
 		return self._board[4*r+c]
 
 	def possibleResults(self, a):
-		s = self._score
 		possible = []
-		g = self.move(a)
-		zeros = [ i for i in range(16) if g._board[i] == 0 ]
+		moved = self.move(a)
+		r = moved.getScore() - self.getScore()
+		zeros = [ i for i in range(16) if moved._board[i] == 0 ]
 		for i in zeros:
-			g = self.move(a)
+			g = copy.deepcopy(moved)
 			for t in [1,2]:
 				g._board[i] = t
 				if t == 1:
-					possible.append((g,.75/len(zeros)))
+					possible.append((g,r,.75/len(zeros)))
 				else:
-					possible.append((g,.25/len(zeros)))
+					possible.append((g,r,.25/len(zeros)))
 			
 		return possible
 		
@@ -105,14 +123,13 @@ class Game2048:
 				board.extend(r)
 			return Game2048(board, s)
 		elif action == 'D':
-			return self._flip().move('R')._flip()
+			return self.flip().move('R').flip()
 		elif action == 'U':
-			f = self._flip()
-			return self._flip().move('L')._flip()
+			return self.flip().move('L').flip()
 		else:
 			print('ERROR move =', action)
 				
-	def _flip(self):
+	def flip(self):
 		r = []
 		for i in range(4):
 			r.extend( self._board[i:16:4] )
@@ -144,8 +161,17 @@ class Game2048:
 					b[4*(3-c) + r] = self._board[4*r+c]
 			return Game2048(b, self._score)
 			
+	def symmetries(self):
+		return [ b.rotate(i) for i in range(4) for b in [self, self.flip()] ]
+			
 	def gameOver(self):
 		return self.actions() == '' or 16 in self._board
+
+	def toInt(self):
+		i = 0
+		for v in self._board:
+			i = 16*i + v
+		return i
 
 	def __str__(self):
 		s = ''

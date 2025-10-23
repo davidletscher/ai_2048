@@ -66,11 +66,11 @@ class Player(BasePlayer):
 
 		if state.gameOver():
 			return state.getScore()
-			
-		actions = self.moveOrder(state)
 
 		if depth == 0:
 			return self.heuristic(state)
+			
+		actions = self.moveOrder(state)
 
 		self._parentCount += 1
 		best = 1e6

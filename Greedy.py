@@ -10,10 +10,12 @@ class Player(BasePlayer):
 		bestMove = ''
 		
 		for a in board.actions():
-			print('Testing', a)
-			m = board.move(a)
-			if m.getScore() > bestScore:
-				bestScore = m.getScore()
+			avgScore = 0.
+			for (result, reward, prob) in board.possibleResults(a):
+				avgScore += prob*reward
+
+			if avgScore > bestScore:
+				bestScore = avgScore
 				bestMove = a
 				
 		self.setMove(bestMove)
