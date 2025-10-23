@@ -174,7 +174,7 @@ def learning(params):
 		stateValue = sum(valueTable[i] for i in tableEntries(state))/numberOfFeatures
 		resultValue = sum(valueTable[i] for i in tableEntries(result))/numberOfFeatures
 		error = reward + discountFactor*resultValue - stateValue
-		totalError += error
+		totalError += abs(error)
 		
 		for i in tableEntries(state):
 			valueTable[i] += learningRate * error / numberOfFeatures
