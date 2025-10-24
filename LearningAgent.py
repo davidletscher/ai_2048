@@ -190,7 +190,7 @@ def train(filename, repetitions):
 		with gzip.open(filename, 'rb') as dataFile:
 			valueTable = pickle.load(dataFile)		
 		for i in range(valueTableSize):
-			valueTableArray = valueTable[i]
+			valueTableArray[i] = valueTable[i]
 		del valueTable
 		print('Data loaded')
 	except:
