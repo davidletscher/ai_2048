@@ -22,7 +22,7 @@ class Player(BasePlayer):
 		self._discountFactor = .999
 		
 		# Setup the table
-		self._valueTable = array.array('f', valueTableSize)
+		self._valueTable = array.array('f', [0.]*valueTableSize)
 		
 	def loadData(self, filename):
 		print('Loading data')
