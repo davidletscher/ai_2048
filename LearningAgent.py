@@ -3,7 +3,6 @@ import random
 import sys
 from math import *
 import gzip
-#import array
 import multiprocessing
 import time
 
@@ -13,12 +12,7 @@ class Player(BasePlayer):
 	def __init__(self, timeLimit):
 		BasePlayer.__init__(self, timeLimit)
 		
-		# Initialize table
-		self._valueTables = []
-		self._tableSizes = []
-		
 		# Parameters
-		self._learningRate = .0001
 		self._discountFactor = .999
 		
 		# Setup the table
@@ -64,10 +58,8 @@ class Player(BasePlayer):
 discountFactor = .999
 episodicMemorySize = 1000000	# Size of episode memory
 gamesPerPass = 1000
-learningPerPass = 1000000
-learningChunkSize = 10000
-numberOfFeatures = 24
-valueTableSize = 3*16**4
+numberOfFeatures = 17
+valueTableSize = 17*16**4
 
 def tupleToIndex(t):
 	i = 0
@@ -77,110 +69,85 @@ def tupleToIndex(t):
 	
 def tableEntries(board):
 	entries = []
+	entries = []
 	
 	for b in board.symmetries():
 		entries.append( tupleToIndex(b.getBoard()[0:4]) )
-		entries.append( tupleToIndex(b.getBoard()[4:8]) + 16**4)
-		entries.append( tupleToIndex(b.getBoard()[0:2] + b.getBoard()[4:6]) + 2*16**4 )
+		entries.append( tupleToIndex(b.getBoard()[4:8])  + 16**4)
+		entries.append( tupleToIndex(b.getBoard()[0:2] + b.getBoard()[4:6])  + 2*16**4)
+		entries.append( tupleToIndex(b.getBoard()[1:3] + b.getBoard()[5:7])  + 3*16**4)
+		entries.append( tupleToIndex(b.getBoard()[5:7] + b.getBoard()[9:11])  + 4*16**4)
+	
+	return entries
+	
+	entries.append( tupleToIndex(board.getBoard()[0:4]) )
+	entries.append( tupleToIndex(board.getBoard()[4:8]) + 16**4)
+	entries.append( tupleToIndex(board.getBoard()[8:12]) + 2*16**4)
+	entries.append( tupleToIndex(board.getBoard()[12:16]) + 3*16**4)
+	entries.append( tupleToIndex(board.getBoard()[0:16:4]) + 4*16**4)
+	entries.append( tupleToIndex(board.getBoard()[1:16:4]) + 5*16**4)
+	entries.append( tupleToIndex(board.getBoard()[2:16:4]) + 6*16**4)
+	entries.append( tupleToIndex(board.getBoard()[3:16:4]) + 7*16**4)
+	
+	entries.append( tupleToIndex(board.getBoard()[0:2] + board.getBoard()[4:6]) + 8*16**4 )
+	entries.append( tupleToIndex(board.getBoard()[1:3] + board.getBoard()[5:7]) + 9*16**4 )
+	entries.append( tupleToIndex(board.getBoard()[2:4] + board.getBoard()[6:8]) + 10*16**4 )
+	entries.append( tupleToIndex(board.getBoard()[4:6] + board.getBoard()[8:10]) + 11*16**4 )
+	entries.append( tupleToIndex(board.getBoard()[5:7] + board.getBoard()[9:11]) + 12*16**4 )
+	entries.append( tupleToIndex(board.getBoard()[6:8] + board.getBoard()[10:12]) + 13*16**4 )
+	entries.append( tupleToIndex(board.getBoard()[8:10] + board.getBoard()[12:14]) + 14*16**4 )
+	entries.append( tupleToIndex(board.getBoard()[9:11] + board.getBoard()[13:15]) + 15*16**4 )
+	entries.append( tupleToIndex(board.getBoard()[10:12] + board.getBoard()[14:16]) + 16*16**4 )
 	
 	return entries
 
-class EpisodeMemory:
-	def __init__(self, stateArray, rewardArray, resultArray, episodeStart, episodeSize, lock):
-		self._state = stateArray
-		self._reward = rewardArray
-		self._result = resultArray
-		
-		self._start = episodeStart
-		self._size = episodeSize
-		
-		self._lock = lock
-		
-	def extend(self, items):
-		with self._lock:
-			for i, e in enumerate(items):
-				if self._size.value < episodicMemorySize:
-					end = (self._start.value + self._size.value) % episodicMemorySize
-					for i in range(16):
-						self._state[16*end+i] = e[0].getBoard()[i]
-					self._reward[end] = e[1]
-					for i in range(16):
-						self._result[16*end+i] = e[2].getBoard()[i]
-					self._size.value += 1
-				else:
-					end = (self._start.value + self._size.value) % episodicMemorySize
-					for i in range(16):
-						self._state[16*end+i] = e[0].getBoard()[i]
-					self._reward[end] = e[1]
-					for i in range(16):
-						self._result[16*end+i] = e[2].getBoard()[i]
-					self._start.value = (self._start.value + 1) % episodicMemorySize
-		
-	def sample(self, numSamples):
-		with self._lock:
-			if self._size.value == episodicMemorySize:
-				indicies = list(range(episodicMemorySize))
-			elif self._start.value + self._size.value <= episodicMemorySize:
-				indicies = list(range(self._start.value, self._start.value + self._size.value))
-			else:
-				indicies = list(range(self._start.value, episodicMemorySize)) + list(range((self._start.value + self._size.value) % episodicMemorySize))
-				
-			return [ (Game2048(array.array('b',self._state[16*i:16*(i+1)])), self._reward[i], Game2048(array.array('b',self._result[16*i:16*(i+1)]))) for i in random.choices(indicies, k=numSamples) ]
-
-
-def initializeThread(valueTableArray, stateArray, rewardArray, resultArray, episodeStart, episodeSize, lock):
-	global valueTable, episodeMemory
-	
+def initializeThread(valueTableArray):
+	global valueTable
 	valueTable = valueTableArray
-	episodeMemory = EpisodeMemory(stateArray, rewardArray, resultArray, episodeStart, episodeSize, lock)
 
-def simulateGame(initialState):
+def bestAction(state):
+	bestValue = float('-inf')
+	bestMove = 'U'
+	
+	for a in state.actions():
+		# Finding the expected (or average) value of the state after the move is taken
+		v = 0
+		for (result, reward, prob) in state.possibleResults(a):
+			v += prob * (reward + sum(valueTable[i] for i in tableEntries(result)))
+			
+		if v > bestValue:
+			bestValue = v
+			bestMove = a
+			
+	return bestMove
+
+def simulateGame(params):
+	initialState, learningRate = params
 	score = 0
 	length = 0
-	transitions = []
 	state = initialState
+	episodes = []
 	while not state.gameOver():
-		bestValue = float('-inf')
-		
-		for a in state.actions():
-			# Finding the expected (or average) value of the state after the move is taken
-			v = 0
-			for (result, reward, prob) in state.possibleResults(a):
-				v += prob * (reward + discountFactor*sum(valueTable[i] for i in tableEntries(result)))/numberOfFeatures
-				
-			if v > bestValue:
-				bestValue = v
-				move = a	
-		
-		oldState = state
-		state, reward = state.result(move)
-		transitions.append( (oldState, reward, state) )
+		a_best = bestAction(state)
+		result, reward = state.result(a_best)
 			
-		length += 1
+		episodes.append( (state, reward, result) )
+	
+		state = result
+		
 		score += reward
+		length += 1
+		maxTile = max(state.getBoard())
 		
-	maxTile = max(state.getBoard())
-		
-	episodeMemory.extend(transitions)
-	
-	return (score, length, maxTile)
-	
-def learning(params):
-	repetitions, learningRate = params
-	totalError = 0.
-	for episode in episodeMemory.sample(repetitions):
-		state, reward, result = episode
-		
-		stateValue = sum(valueTable[i] for i in tableEntries(state))/numberOfFeatures
-		resultValue = sum(valueTable[i] for i in tableEntries(result))/numberOfFeatures
-		error = reward + discountFactor*resultValue - stateValue
-		totalError += abs(error)
+		vState = sum(valueTable[i] for i in tableEntries(state))
+		vResult = sum(valueTable[i] for i in tableEntries(result))
+
+		delta = reward + vResult - vState
 		
 		for i in tableEntries(state):
-			valueTable[i] += learningRate * error / numberOfFeatures
-			
-	return totalError
-		
+			valueTable[i] += learningRate * delta
+	
+	return (score, length, maxTile)
 		
 def train(filename, repetitions):
 	print('Starting training')
@@ -196,26 +163,20 @@ def train(filename, repetitions):
 	except:
 		for i in range(valueTableSize):
 			valueTableArray[i] = 0.
-			
-	stateArray = multiprocessing.RawArray('b', 16*episodicMemorySize)
-	rewardArray = multiprocessing.RawArray('i', episodicMemorySize)
-	resultArray = multiprocessing.RawArray('b', 16*episodicMemorySize)
-	episodeStart = multiprocessing.RawValue('i', 0)
-	episodeSize = multiprocessing.RawValue('i', 0)
-	lock = multiprocessing.Lock()
 	
 	totalGames = 0
 	totalLearning = 0
 	bestAverageScore = 0
-	learningRate = .1
+	learningRate = .001
 	startTime = time.time()
-	with multiprocessing.Pool(initializer=initializeThread, initargs=(valueTableArray, stateArray, rewardArray, resultArray, episodeStart, episodeSize, lock)) as pool:
+	with multiprocessing.Pool(initializer=initializeThread, initargs=(valueTableArray, )) as pool:
 		for rep in range(repetitions):
-			# Run 1000 games storing every step in the episode memory
-			scores = pool.map(simulateGame, [Game2048(None,None,True) for i in range(gamesPerPass)])
+			# Run gamesPerPass games storing every step in the episode memory
+			scores = pool.map(simulateGame, [(Game2048(None,None,True), learningRate) for i in range(gamesPerPass)])
 			totalGames += gamesPerPass
 			averageScore = sum(s[0] for s in scores)/gamesPerPass
 			averageLength = sum(s[1] for s in scores)/gamesPerPass
+			totalLearning += sum(s[1] for s in scores)
 			maxScore = max(s[0] for s in scores)
 			
 			maxTileCount = {}
@@ -226,25 +187,20 @@ def train(filename, repetitions):
 			print()
 			print(f'Average score {averageScore:,.2f}, max score {maxScore:,} and average game length {averageLength:,.2f}.')
 			print(f'Max tile count {{ { maxTiles } }}')
+			print(f'{totalGames:,} games played and {totalLearning:,} learning steps.')
+			print(f'Ellapsed time {time.time() - startTime:.0f} seconds.')
 
-			if averageScore > bestAverageScore:
+			if averageScore > bestAverageScore or (rep+1) % 50 == 0:
 				print('Saving data')
 				valueTableCopy = array.array('f', valueTableArray)
 				with gzip.open(F'{filename}_{int(totalGames)}_{int(averageScore)}', 'wb') as dataFile:
 					pickle.dump(valueTableCopy, dataFile)	
 				del valueTableCopy
-				bestAverageScore = averageScore				
-			
-			# Do a million learning passes broken into chunks of size 
-			totalError = sum(pool.map(learning, [ (learningChunkSize, learningRate) for i in range(learningPerPass//learningChunkSize)])) / learningPerPass
-			totalLearning += learningPerPass
-		
-			print(f'After {totalGames:,} games and {totalLearning:,.0f} learning passes the average error is {totalError:.2f}')
-			print(f'Ellapsed time {time.time() - startTime:.0f} seconds.')
+				bestAverageScore = averageScore			
 	
 	with gzip.open(filename, 'wb') as dataFile:
 		valueTableCopy = array.array('f', valueTableArray)
-		with gzip.open(F'{filename}_{int(totalLearning/1e6)}_{int(totalError)}', 'wb') as dataFile:
+		with gzip.open(F'{filename}', 'wb') as dataFile:
 			pickle.dump(valueTableCopy, dataFile)	
 		del valueTableCopy
 		
