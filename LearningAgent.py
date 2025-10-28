@@ -56,7 +56,6 @@ class Player(BasePlayer):
 	
 # Learning parameters
 discountFactor = .999
-episodicMemorySize = 1000000	# Size of episode memory
 gamesPerPass = 1000
 numberOfFeatures = 17
 valueTableSize = 17*16**4
@@ -129,10 +128,10 @@ def simulateGame(params):
 		vState = sum(valueTable[i] for i in tableEntries(state))
 		vResult = sum(valueTable[i] for i in tableEntries(result))
 
-		delta = reward + vResult - vState
+		error = reward + discountFactor*vResult - vState
 		
 		for i in tableEntries(state):
-			valueTable[i] += learningRate * delta
+			valueTable[i] += learningRate * error
 	
 	return (score, length, maxTile)
 		
