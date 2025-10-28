@@ -57,7 +57,7 @@ class Player(BasePlayer):
 # Learning parameters
 discountFactor = .999
 gamesPerPass = 1000
-valueTableSize = 17*16**4
+valueTableSize = 4*16**4
 initialLearningRate = .01
 
 def tupleToIndex(t):
@@ -69,24 +69,11 @@ def tupleToIndex(t):
 def tableEntries(board):
 	entries = []
 	
-	entries.append( tupleToIndex(board.getBoard()[0:4]) )
-	entries.append( tupleToIndex(board.getBoard()[4:8]) + 16**4)
-	entries.append( tupleToIndex(board.getBoard()[8:12]) + 2*16**4)
-	entries.append( tupleToIndex(board.getBoard()[12:16]) + 3*16**4)
-	entries.append( tupleToIndex(board.getBoard()[0:16:4]) + 4*16**4)
-	entries.append( tupleToIndex(board.getBoard()[1:16:4]) + 5*16**4)
-	entries.append( tupleToIndex(board.getBoard()[2:16:4]) + 6*16**4)
-	entries.append( tupleToIndex(board.getBoard()[3:16:4]) + 7*16**4)
-	
-	entries.append( tupleToIndex(board.getBoard()[0:2] + board.getBoard()[4:6]) + 8*16**4 )
-	entries.append( tupleToIndex(board.getBoard()[1:3] + board.getBoard()[5:7]) + 9*16**4 )
-	entries.append( tupleToIndex(board.getBoard()[2:4] + board.getBoard()[6:8]) + 10*16**4 )
-	entries.append( tupleToIndex(board.getBoard()[4:6] + board.getBoard()[8:10]) + 11*16**4 )
-	entries.append( tupleToIndex(board.getBoard()[5:7] + board.getBoard()[9:11]) + 12*16**4 )
-	entries.append( tupleToIndex(board.getBoard()[6:8] + board.getBoard()[10:12]) + 13*16**4 )
-	entries.append( tupleToIndex(board.getBoard()[8:10] + board.getBoard()[12:14]) + 14*16**4 )
-	entries.append( tupleToIndex(board.getBoard()[9:11] + board.getBoard()[13:15]) + 15*16**4 )
-	entries.append( tupleToIndex(board.getBoard()[10:12] + board.getBoard()[14:16]) + 16*16**4 )
+	for s in board.symmetries():
+		entries.append( tupleToIndex(board.getBoard()[0:4]) )
+		entries.append( tupleToIndex(board.getBoard()[0:2] + board.getBoard()[4:6]) + 16**4 )
+		entries.append( tupleToIndex(board.getBoard()[1:3] + board.getBoard()[5:7]) + 2*16**4 )
+		entries.append( tupleToIndex(board.getBoard()[5:7] + board.getBoard()[9:11]) + 3*16**4 )
 	
 	return entries
 
@@ -118,8 +105,6 @@ def simulateGame(params):
 	while not state.gameOver():
 		a_best = bestAction(state)
 		result, reward = state.result(a_best)
-	
-		state = result
 		
 		score += reward
 		length += 1
@@ -132,6 +117,8 @@ def simulateGame(params):
 		
 		for i in tableEntries(state):
 			valueTable[i] += learningRate * error
+	
+		state = result
 	
 	return (score, length, maxTile)
 		
