@@ -36,7 +36,7 @@ class Player(BasePlayer):
 		for i in tableEntries(board):
 			v += self._valueTables[i]
 			
-		return v / numberOfFeatures
+		return v
 
 	def findMove(self, board):
 		bestValue = float('-inf')
@@ -46,7 +46,7 @@ class Player(BasePlayer):
 			# Finding the expected (or average) value of the state after the move is taken
 			v = 0
 			for (result, reward, prob) in board.possibleResults(a):
-				v += prob * (reward + self.value(result))
+				v += prob * (reward + self._discountFactor*self.value(result))
 				
 			if v > bestValue:
 				bestValue = v
@@ -57,8 +57,8 @@ class Player(BasePlayer):
 # Learning parameters
 discountFactor = .999
 gamesPerPass = 1000
-numberOfFeatures = 17
 valueTableSize = 17*16**4
+initialLearningRate = .01
 
 def tupleToIndex(t):
 	i = 0
@@ -136,12 +136,11 @@ def simulateGame(params):
 	return (score, length, maxTile)
 		
 def train(filename, repetitions):
-	print('Starting training')
 	
 	valueTableArray = multiprocessing.RawArray('f', valueTableSize)
 	try:
 		with gzip.open(filename, 'rb') as dataFile:
-			valueTable = pickle.load(dataFile)		
+			valueTable = pickle.load(dataFile)
 		for i in range(valueTableSize):
 			valueTableArray[i] = valueTable[i]
 		del valueTable
@@ -149,11 +148,13 @@ def train(filename, repetitions):
 	except:
 		for i in range(valueTableSize):
 			valueTableArray[i] = 0.
+			
+	print('Starting training')
 	
 	totalGames = 0
 	totalLearning = 0
 	bestAverageScore = 0
-	learningRate = .01
+	learningRate = initialLearningRate
 	startTime = time.time()
 	with multiprocessing.Pool(initializer=initializeThread, initargs=(valueTableArray, )) as pool:
 		for rep in range(repetitions):
@@ -176,19 +177,13 @@ def train(filename, repetitions):
 			print(f'{totalGames:,} games played and {totalLearning:,} learning steps.')
 			print(f'Ellapsed time {time.time() - startTime:.0f} seconds.')
 
-			if averageScore > bestAverageScore or (rep+1) % 50 == 0:
+			if averageScore > bestAverageScore or (rep+1) % 50 == 0 or rep == repetitions - 1:
 				print('Saving data')
 				valueTableCopy = array.array('f', valueTableArray)
-				with gzip.open(F'{filename}_{int(totalGames)}_{int(averageScore)}', 'wb') as dataFile:
+				with gzip.open(f'{filename}_{int(totalGames)}_{int(averageScore)}', 'wb') as dataFile:
 					pickle.dump(valueTableCopy, dataFile)	
 				del valueTableCopy
-				bestAverageScore = averageScore			
-	
-	with gzip.open(filename, 'wb') as dataFile:
-		valueTableCopy = array.array('f', valueTableArray)
-		with gzip.open(F'{filename}', 'wb') as dataFile:
-			pickle.dump(valueTableCopy, dataFile)	
-		del valueTableCopy
+				bestAverageScore = averageScore	
 		
 if __name__ == '__main__':
 	train(sys.argv[1], int(sys.argv[2]))
