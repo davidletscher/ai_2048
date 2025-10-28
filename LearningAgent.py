@@ -69,16 +69,6 @@ def tupleToIndex(t):
 	
 def tableEntries(board):
 	entries = []
-	entries = []
-	
-	for b in board.symmetries():
-		entries.append( tupleToIndex(b.getBoard()[0:4]) )
-		entries.append( tupleToIndex(b.getBoard()[4:8])  + 16**4)
-		entries.append( tupleToIndex(b.getBoard()[0:2] + b.getBoard()[4:6])  + 2*16**4)
-		entries.append( tupleToIndex(b.getBoard()[1:3] + b.getBoard()[5:7])  + 3*16**4)
-		entries.append( tupleToIndex(b.getBoard()[5:7] + b.getBoard()[9:11])  + 4*16**4)
-	
-	return entries
 	
 	entries.append( tupleToIndex(board.getBoard()[0:4]) )
 	entries.append( tupleToIndex(board.getBoard()[4:8]) + 16**4)
@@ -126,12 +116,9 @@ def simulateGame(params):
 	score = 0
 	length = 0
 	state = initialState
-	episodes = []
 	while not state.gameOver():
 		a_best = bestAction(state)
 		result, reward = state.result(a_best)
-			
-		episodes.append( (state, reward, result) )
 	
 		state = result
 		
@@ -167,7 +154,7 @@ def train(filename, repetitions):
 	totalGames = 0
 	totalLearning = 0
 	bestAverageScore = 0
-	learningRate = .001
+	learningRate = .01
 	startTime = time.time()
 	with multiprocessing.Pool(initializer=initializeThread, initargs=(valueTableArray, )) as pool:
 		for rep in range(repetitions):
