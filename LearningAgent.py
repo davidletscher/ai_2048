@@ -13,7 +13,7 @@ class Player(BasePlayer):
 		BasePlayer.__init__(self, timeLimit)
 		
 		# Parameters
-		self._discountFactor = .999
+		self._discountFactor = discountFactor
 		
 		# Setup the table
 		self._valueTable = array.array('f', [0.]*valueTableSize)
@@ -34,7 +34,7 @@ class Player(BasePlayer):
 		# also get the last row, first column and last column.
 		v = 0.
 		for i in tableEntries(board):
-			v += self._valueTables[i]
+			v += self._valueTable[i]
 			
 		return v
 
@@ -52,13 +52,14 @@ class Player(BasePlayer):
 				bestValue = v
 				bestMove = a
 				
+		print(f'Best move {bestMove} with value {bestValue}')
 		self.setMove(bestMove)
 	
 # Learning parameters
 discountFactor = .999
 gamesPerPass = 1000
-valueTableSize = 4*16**4
-initialLearningRate = .01
+valueTableSize = 5*16**4
+initialLearningRate = .001
 
 def tupleToIndex(t):
 	i = 0
@@ -71,19 +72,16 @@ def tableEntries(board):
 	
 	for s in board.symmetries():
 		entries.append( tupleToIndex(board.getBoard()[0:4]) )
-		entries.append( tupleToIndex(board.getBoard()[0:2] + board.getBoard()[4:6]) + 16**4 )
-		entries.append( tupleToIndex(board.getBoard()[1:3] + board.getBoard()[5:7]) + 2*16**4 )
-		entries.append( tupleToIndex(board.getBoard()[5:7] + board.getBoard()[9:11]) + 3*16**4 )
+		entries.append( tupleToIndex(board.getBoard()[4:8]) + 16**4 )
+		entries.append( tupleToIndex(board.getBoard()[0:2] + board.getBoard()[4:6]) + 2*16**4 )
+		entries.append( tupleToIndex(board.getBoard()[1:3] + board.getBoard()[5:7]) + 3*16**4 )
+		entries.append( tupleToIndex(board.getBoard()[5:7] + board.getBoard()[9:11]) + 4*16**4 )
 	
 	return entries
 
-def initializeThread(valueTableArray):
-	global valueTable
-	valueTable = valueTableArray
-
 def bestAction(state):
 	bestValue = float('-inf')
-	bestMove = 'U'
+	bestMove = None
 	
 	for a in state.actions():
 		# Finding the expected (or average) value of the state after the move is taken
@@ -102,6 +100,7 @@ def simulateGame(params):
 	score = 0
 	length = 0
 	state = initialState
+	episodes = []
 	while not state.gameOver():
 		a_best = bestAction(state)
 		result, reward = state.result(a_best)
@@ -109,21 +108,27 @@ def simulateGame(params):
 		score += reward
 		length += 1
 		maxTile = max(state.getBoard())
+
+		episodes.append((state, result, reward))
+			
+		state = result
 		
+	for (state, result, reward) in episodes:
 		vState = sum(valueTable[i] for i in tableEntries(state))
-		vResult = sum(valueTable[i] for i in tableEntries(result))
+		if not result.gameOver():
+			vResult = sum(valueTable[i] for i in tableEntries(result))
+		else:
+			vResult = 0
 
 		error = reward + discountFactor*vResult - vState
 		
 		for i in tableEntries(state):
 			valueTable[i] += learningRate * error
-	
-		state = result
+		
 	
 	return (score, length, maxTile)
 		
-def train(filename, repetitions):
-	
+def train(filename, repetitions):	
 	valueTableArray = multiprocessing.RawArray('f', valueTableSize)
 	try:
 		with gzip.open(filename, 'rb') as dataFile:
@@ -170,7 +175,11 @@ def train(filename, repetitions):
 				with gzip.open(f'{filename}_{int(totalGames)}_{int(averageScore)}', 'wb') as dataFile:
 					pickle.dump(valueTableCopy, dataFile)	
 				del valueTableCopy
-				bestAverageScore = averageScore	
+				bestAverageScore = max(bestAverageScore, averageScore)	
+				
+def initializeThread(valueTableArray):
+	global valueTable
+	valueTable = valueTableArray
 		
 if __name__ == '__main__':
 	train(sys.argv[1], int(sys.argv[2]))
