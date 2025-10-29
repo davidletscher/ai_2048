@@ -21,12 +21,12 @@ class Player(BasePlayer):
 	def loadData(self, filename):
 		print('Loading data')
 		with gzip.open(filename, 'rb') as dataFile:
-			self._valueTables = pickle.load(dataFile)
+			self._valueTable = pickle.load(dataFile)
 		
 	def saveData(self, filename):
 		print('Saving data')
 		with gzip.open(filename, 'wb') as dataFile:
-			pickle.dump(self._valueTables, dataFile)
+			pickle.dump(self._valueTable, dataFile)
 
 	def value(self, board):
 		# The table stores the value of the first row.
